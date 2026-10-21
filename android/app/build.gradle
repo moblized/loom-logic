@@ -1,0 +1,62 @@
+plugins {
+    id 'com.android.application'
+}
+
+// The game lives at the repo root (index.html + fonts/) so GitHub Pages and the app share one copy.
+def gameAssets = layout.buildDirectory.dir('generated/gameAssets').get().asFile
+def runNumber = (System.getenv('GITHUB_RUN_NUMBER') ?: '1').toInteger()
+
+android {
+    namespace 'io.github.moblized.loomlogic'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'io.github.moblized.loomlogic'
+        minSdk 26
+        targetSdk 34
+        versionCode runNumber
+        versionName "1.0.${runNumber}"
+    }
+
+    signingConfigs {
+        release {
+            def ks = System.getenv('KEYSTORE_PATH')
+            if (ks) {
+                storeFile file(ks)
+                storePassword System.getenv('KEYSTORE_PASSWORD')
+                keyAlias System.getenv('KEY_ALIAS')
+                keyPassword System.getenv('KEYSTORE_PASSWORD')
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig System.getenv('KEYSTORE_PATH') ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    sourceSets {
+        main {
+            assets.srcDirs += [gameAssets]
+        }
+    }
+
+    lint {
+        checkReleaseBuilds false
+        abortOnError false
+    }
+}
+
+tasks.register('copyGame', Copy) {
+    from(rootProject.file('../index.html'))
+    from(rootProject.file('../fonts')) { into 'fonts' }
+    into gameAssets
+}
+preBuild.dependsOn copyGame
