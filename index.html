@@ -1,0 +1,927 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="A calm, no-timer deduction puzzle: work out the hidden weaving rule from scattered clues.">
+<style>
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0}
+img{max-width:100%}
+[hidden]{display:none!important}
+</style>
+<title>Loom Logic</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@500;600&family=Syne:wght@700;800&display=swap">
+<style>
+/* Layout: a framed swatch of cloth is the centre of attention; tools (rule card, lens, actions) sit below it on phones and to its right from 900px. */
+:root{
+  --bg:#E2E6EC;          /* loom-room grey, biased toward indigo */
+  --panel:#F3F5F8;
+  --line:#C3CAD5;
+  --fg:#17203A;
+  --muted:#56607A;
+  --thread:#24407F;      /* filled cell: indigo thread */
+  --cloth:#FCFCFA;       /* empty cell: undyed cloth */
+  --unwoven:#D3D9E2;     /* not known yet */
+  --unwoven-dot:#A7B1C1;
+  --clue:#E0A11C;        /* weld yellow clue mark */
+  --clue-edge:#463004;
+  --alert:#BE2F48;       /* madder: mismatch */
+  --ok:#2B7752;
+  --focus:#17203A;
+  --sheen:rgba(255,255,255,.10);
+  --scrim:rgba(18,26,48,.45);
+  --font-display:'Syne','Trebuchet MS','Segoe UI',sans-serif;
+  --font-body:'Atkinson Hyperlegible',Verdana,'Segoe UI',system-ui,sans-serif;
+  --font-mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+  --scale:1;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E1326;--panel:#161D35;--line:#2D3758;--fg:#E5E9F5;--muted:#9BA5C2;
+    --thread:#B3C6F4;--cloth:#29335A;--unwoven:#10152B;--unwoven-dot:#38436E;
+    --clue:#F2B53A;--clue-edge:#1B1303;--alert:#FF6F86;--ok:#63C495;--focus:#F5F7FD;
+    --sheen:rgba(14,19,38,.14);--scrim:rgba(0,0,0,.62);color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E1326;--panel:#161D35;--line:#2D3758;--fg:#E5E9F5;--muted:#9BA5C2;
+  --thread:#B3C6F4;--cloth:#29335A;--unwoven:#10152B;--unwoven-dot:#38436E;
+  --clue:#F2B53A;--clue-edge:#1B1303;--alert:#FF6F86;--ok:#63C495;--focus:#F5F7FD;
+  --sheen:rgba(14,19,38,.14);--scrim:rgba(0,0,0,.62);color-scheme:dark;
+}
+html{font-size:calc(100% * var(--scale))}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:1rem;line-height:1.5}
+*{box-sizing:border-box}
+button{font:inherit;color:inherit}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+.app{max-width:1120px;margin:0 auto;padding-block:14px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:16px}
+
+/* header */
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;min-width:0}
+.brand h1{font-family:var(--font-display);font-weight:800;font-size:1.7rem;letter-spacing:-.01em;margin:0;line-height:1}
+.brand h1 span{color:var(--thread)}
+.tag{margin:0;color:var(--muted);font-size:.9rem}
+.top-actions{display:flex;gap:8px}
+.pill{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:.45em 1em;min-height:40px;font-weight:700;font-size:.9rem;cursor:pointer}
+.pill:hover{border-color:var(--muted)}
+
+/* main layout */
+.layout{display:grid;grid-template-columns:minmax(0,1fr);gap:16px}
+@media (min-width:900px){.layout{grid-template-columns:minmax(0,1.2fr) minmax(330px,.8fr);align-items:start}}
+.stage{display:flex;flex-direction:column;gap:12px;min-width:0}
+.tools{display:flex;flex-direction:column;gap:12px;min-width:0}
+
+/* how-to */
+.howto{border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+.howto summary{cursor:pointer;padding:10px 14px;font-weight:700;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.howto summary::-webkit-details-marker{display:none}
+.howto summary::after{content:"Show";font-size:.8rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.howto[open] summary::after{content:"Hide"}
+.howto-body{padding:0 14px 14px;max-width:68ch}
+.howto ol{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:6px}
+.howto p{margin:10px 0 0}
+.calm-line{color:var(--muted);font-size:.9rem}
+
+/* status */
+.status{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;min-height:44px}
+.lvl{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.lvl-n{font-family:var(--font-display);font-weight:800;font-size:1.25rem}
+.lvl-set{font-size:.78rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-weight:700}
+.meta{font-family:var(--font-mono);font-size:.8rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.won{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--ok);background:var(--panel)}
+.won-text{min-width:0}
+.won-text strong{font-family:var(--font-display);font-size:1.15rem;margin-right:6px}
+.won-sub{display:block;color:var(--muted);font-size:.88rem}
+.busy-line{color:var(--muted);font-style:italic}
+
+/* the cloth */
+.swatch{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 12px 14px;display:flex;justify-content:center}
+.cloth{display:grid;grid-template-columns:repeat(var(--w),minmax(0,1fr));gap:2px;width:100%;max-width:calc(var(--w) * 36px)}
+.cloth.busy{opacity:.45}
+.warp{height:12px;background:linear-gradient(to right,transparent calc(50% - .75px),var(--line) calc(50% - .75px),var(--line) calc(50% + .75px),transparent calc(50% + .75px))}
+.divider{grid-column:1/-1;border-top:1.5px dashed var(--line);margin:3px 0}
+.cell{position:relative;aspect-ratio:1;max-width:100%;border:0;padding:0;margin:0;border-radius:2px;cursor:pointer;background:var(--unwoven);
+  background-image:radial-gradient(var(--unwoven-dot) 18%,transparent 20%);background-size:50% 50%;background-position:25% 25%;
+  transition:background-color .12s ease}
+.cell.f{background:var(--thread);background-image:repeating-linear-gradient(0deg,transparent 0 3px,var(--sheen) 3px 4px)}
+.cell.e{background:var(--cloth);background-image:none;box-shadow:inset 0 0 0 1px var(--line)}
+/* missing top-row cell the player sets */
+.cell.seedh::before{content:"";position:absolute;inset:1px;border:2px dashed var(--clue);border-radius:2px;pointer-events:none}
+/* clue marks: solid diamond = must be filled, hollow diamond = must be empty */
+.cell.cf::after,.cell.ce::after{content:"";position:absolute;inset:29%;transform:rotate(45deg);border-radius:1px;pointer-events:none}
+.cell.cf::after{background:var(--clue);box-shadow:0 0 0 1.5px var(--clue-edge)}
+.cell.ce::after{background:transparent;border:2.5px solid var(--clue);box-shadow:0 0 0 1px var(--clue-edge),inset 0 0 0 1px var(--clue-edge)}
+/* same rule entry as the selected cell */
+.cell.same::before{content:"";position:absolute;top:0;left:0;width:0;height:0;border-top:8px solid var(--clue);border-right:8px solid transparent;pointer-events:none}
+.cell.par{outline:2px dashed var(--focus);outline-offset:0;z-index:1}
+.cell.sel{outline:3px solid var(--focus);outline-offset:1px;z-index:2}
+.cell:focus-visible{outline:3px solid var(--clue);outline-offset:2px;z-index:3}
+.contrast .cell{box-shadow:inset 0 0 0 1px var(--fg)}
+.contrast .cell.u, .contrast .cell:not(.f):not(.e){background-size:34% 34%}
+.cell.bad, .contrast .cell.bad{box-shadow:inset 0 0 0 3px var(--alert)}
+.edge-note{margin:0;font-size:.85rem;color:var(--muted);text-align:center}
+/* pencil marks: round, so they never read as clue diamonds */
+.cell.mf::after,.cell.me::after{content:"";position:absolute;inset:33%;border-radius:50%;pointer-events:none}
+.cell.mf::after{background:var(--focus);box-shadow:0 0 0 1.5px var(--cloth)}
+.cell.me::after{border:2px solid var(--focus);box-shadow:0 0 0 1.5px var(--cloth),inset 0 0 0 1px var(--cloth)}
+.cell.mf.mbad::after{background:var(--alert)}
+.cell.me.mbad::after{border-color:var(--alert)}
+.g.mf::after,.g.me::after{content:"";position:absolute;inset:28%;border-radius:50%}
+.g.mf::after{background:var(--focus)}
+.g.me::after{border:1.5px solid var(--focus)}
+.toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.toolbar .lab{font-size:.72rem;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:700}
+.mode{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:3px;background:var(--panel);gap:2px}
+.mode button{border:0;background:transparent;border-radius:999px;padding:.3em 1em;min-height:38px;font-weight:700;cursor:pointer;color:var(--fg)}
+.mode button[aria-pressed="true"]{background:var(--thread);color:var(--cloth)}
+.mode button:focus-visible{outline:3px solid var(--clue);outline-offset:2px}
+.mode-hint{font-size:.85rem;color:var(--muted);flex:1 1 180px;min-width:0}
+
+@keyframes sweep{0%{filter:brightness(1)}45%{filter:brightness(1.45) saturate(1.2)}100%{filter:brightness(1)}}
+.cloth.sweep .cell{animation:sweep .7s ease both;animation-delay:calc(var(--r) * 70ms)}
+@media (prefers-reduced-motion: reduce){.cloth.sweep .cell{animation:none}.cell{transition:none}}
+.calm .cloth.sweep .cell{animation:none}
+.calm .cell{transition:none}
+
+/* cards */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 12px 14px;display:flex;flex-direction:column;gap:10px}
+.card-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.card h2{margin:0;font-family:var(--font-display);font-weight:700;font-size:1.05rem}
+.rulenum{font-family:var(--font-mono);font-size:.82rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.rulenum b{color:var(--fg)}
+.entries{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:5px}
+.entry{display:flex;flex-direction:column;align-items:center;gap:4px;padding:7px 0 5px;border:1px solid var(--line);border-radius:7px;background:var(--bg);cursor:pointer;min-width:0}
+.entry:hover{border-color:var(--muted)}
+.entry:focus-visible{outline:3px solid var(--clue);outline-offset:2px}
+.entry.hl{outline:3px solid var(--focus);outline-offset:1px}
+.pat{display:flex;gap:2px}
+.pat i{display:block;width:9px;height:9px;border-radius:1px;background:var(--cloth);box-shadow:inset 0 0 0 1px var(--line)}
+.pat i.f{background:var(--thread);box-shadow:none}
+.stem{width:1.5px;height:6px;background:var(--muted)}
+.out{width:26px;height:26px;border-radius:3px;background:var(--unwoven);background-image:radial-gradient(var(--unwoven-dot) 18%,transparent 20%);background-size:50% 50%;background-position:25% 25%;box-shadow:inset 0 0 0 1px var(--line)}
+.out.f{background:var(--thread);background-image:repeating-linear-gradient(0deg,transparent 0 3px,var(--sheen) 3px 4px);box-shadow:none}
+.out.e{background:var(--cloth);background-image:none}
+.bits{font-family:var(--font-mono);font-weight:600;font-size:.68rem;color:var(--muted);letter-spacing:.02em}
+.card-foot{margin:0;font-size:.85rem;color:var(--muted)}
+@media (max-width:360px){.pat i{width:7px;height:7px}.out{width:22px;height:22px}}
+
+/* lens */
+.lens-body{display:flex;flex-direction:column;gap:7px;min-height:5.5em}
+.lens-body p{margin:0}
+.where{font-weight:700}
+.lrow{display:grid;grid-template-columns:7.2em minmax(0,1fr);gap:8px;align-items:baseline}
+.lab{font-size:.72rem;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:700}
+.lens-note{font-size:.88rem;color:var(--muted)}
+.flash{padding:8px 10px;border-radius:8px;border:1px dashed var(--clue);font-size:.92rem}
+.mismatch{color:var(--alert);font-weight:700}
+.match{color:var(--ok);font-weight:700}
+.mono{font-family:var(--font-mono);font-size:.85em}
+
+/* inline glyphs */
+.g{display:inline-block;width:1em;height:1em;vertical-align:-.15em;border-radius:2px;margin-right:2px;position:relative;background:var(--unwoven);box-shadow:inset 0 0 0 1px var(--line)}
+.g.f{background:var(--thread);box-shadow:none}
+.g.e{background:var(--cloth)}
+.g.x{background:var(--cloth);box-shadow:none;outline:1.5px dashed var(--muted);outline-offset:-1.5px}
+.g.cf::after,.g.ce::after{content:"";position:absolute;inset:24%;transform:rotate(45deg)}
+.g.cf::after{background:var(--clue);box-shadow:0 0 0 1px var(--clue-edge)}
+.g.ce::after{border:2px solid var(--clue);box-shadow:0 0 0 1px var(--clue-edge)}
+
+/* actions */
+.actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:9px;padding:.55em .6em;min-height:46px;font-weight:700;font-size:.95rem;cursor:pointer}
+.btn:hover:not(:disabled){border-color:var(--muted)}
+.btn:disabled{opacity:.45;cursor:default}
+.btn.primary{background:var(--thread);color:var(--cloth);border-color:var(--thread)}
+.btn:focus-visible,.pill:focus-visible,.lv:focus-visible{outline:3px solid var(--clue);outline-offset:2px}
+.btn small{display:block;font-weight:400;font-size:.72rem;color:var(--muted)}
+.btn.primary small{color:inherit;opacity:.8}
+
+/* sheets */
+.sheet-back{position:fixed;inset:0;background:var(--scrim);display:flex;align-items:flex-end;justify-content:center;z-index:50;padding-top:env(safe-area-inset-top,0px)}
+@media (min-width:700px){.sheet-back{align-items:center;padding:24px}}
+.sheet{background:var(--panel);color:var(--fg);width:min(600px,100%);max-height:88%;overflow:auto;border-radius:16px 16px 0 0;padding-block:18px calc(22px + env(safe-area-inset-bottom,0px));padding-left:max(18px,env(safe-area-inset-left,0px));padding-right:max(18px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:16px}
+@media (min-width:700px){.sheet{border-radius:16px}}
+.sheet-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.sheet h2{margin:0;font-family:var(--font-display);font-weight:800;font-size:1.35rem;outline:none}
+.set-block{display:flex;flex-direction:column;gap:6px}
+.set-block h3{margin:0;font-family:var(--font-display);font-weight:700;font-size:1rem;display:flex;gap:10px;align-items:baseline}
+.set-block h3 .meta{font-size:.75rem}
+.set-block p{margin:0;color:var(--muted);font-size:.9rem;max-width:62ch}
+.lv-row{display:flex;gap:6px;flex-wrap:wrap}
+.lv{width:44px;height:44px;border-radius:6px;border:1px solid var(--line);background:var(--bg);font-family:var(--font-mono);font-weight:600;cursor:pointer;font-variant-numeric:tabular-nums}
+.lv.done{background:var(--thread);color:var(--cloth);border-color:var(--thread)}
+.lv.cur{outline:3px solid var(--focus);outline-offset:1px}
+.practice{display:flex;flex-wrap:wrap;gap:8px}
+.practice .btn{flex:1 1 150px}
+.opt{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line)}
+.opt:first-of-type{border-top:0}
+.opt input[type=checkbox]{width:22px;height:22px;margin:2px 0 0;accent-color:var(--thread);flex:none}
+.opt label{cursor:pointer}
+.opt-t{font-weight:700;display:block}
+.opt-d{color:var(--muted);font-size:.9rem;display:block}
+.sizes{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.sizes label{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer;background:var(--bg)}
+.sizes input{accent-color:var(--thread)}
+.danger{color:var(--alert)}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header class="top">
+    <div class="brand">
+      <h1>Loom <span>Logic</span></h1>
+      <p class="tag">Work up from small pieces of cloth to the rule that wove it.</p>
+    </div>
+    <nav class="top-actions" aria-label="Menus">
+      <button class="pill" id="btn-patterns" type="button">Patterns</button>
+      <button class="pill" id="btn-settings" type="button">Settings</button>
+    </nav>
+  </header>
+
+  <main class="layout">
+    <section class="stage" aria-label="Puzzle">
+      <details class="howto" id="howto">
+        <summary>How it works</summary>
+        <div class="howto-body">
+          <ol>
+            <li>The top row is where the cloth starts. Every row below it is made from the row directly above.</li>
+            <li>Each cell looks at the three cells above it: up-left, straight up, and up-right. Anything past the left or right edge counts as empty.</li>
+            <li>There are only 8 possible three-cell patterns. The rule card says what each one makes: a <span class="g f" aria-hidden="true"></span>filled cell or an <span class="g e" aria-hidden="true"></span>empty cell. One card is used for the whole cloth.</li>
+            <li>The card is hidden. You get clue marks instead. <span class="g e cf" aria-hidden="true"></span>A solid diamond means the cell is filled. <span class="g e ce" aria-hidden="true"></span>A hollow diamond means the cell is empty.</li>
+            <li>Set the rule card, and any top-row cells with a yellow dashed outline, until the whole cloth is woven and every clue matches.</li>
+          </ol>
+          <p>A good way in: find a clue whose three cells above it are already known. That clue tells you one rule entry for certain. Grey dotted cells are not known yet.</p>
+          <p>Switch to Mark to pencil in what you have worked out about a cell: <span class="g e mf" aria-hidden="true"></span>a dot for filled, <span class="g e me" aria-hidden="true"></span>a ring for empty. Marks are only notes. They never change the cloth.</p>
+          <p class="calm-line">No timer, no sound, no score to lose. Every move can be undone. Keyboard: arrow keys move around the cloth, 1 to 8 switch rule entries, M switches Look and Mark, Z undoes, Y redoes.</p>
+        </div>
+      </details>
+
+      <div class="status" id="status" aria-live="polite"></div>
+      <div class="toolbar">
+        <span class="lab" id="mode-lab">Tap the cloth to</span>
+        <div class="mode" role="group" aria-labelledby="mode-lab">
+          <button type="button" id="mode-look" aria-pressed="true">Look</button>
+          <button type="button" id="mode-mark" aria-pressed="false">Mark</button>
+        </div>
+        <span class="mode-hint" id="mode-hint">Look shows what made a cell.</span>
+      </div>
+      <div class="swatch">
+        <div class="cloth" id="cloth" aria-label="Cloth"></div>
+      </div>
+      <p class="edge-note">Past the left and right edges counts as empty. The dashed line marks where weaving starts.</p>
+    </section>
+
+    <aside class="tools" aria-label="Tools">
+      <section class="card" aria-labelledby="rule-h">
+        <div class="card-head">
+          <h2 id="rule-h">Rule card</h2>
+          <span class="rulenum" id="rulenum"></span>
+        </div>
+        <div class="entries" id="entries"></div>
+        <p class="card-foot">Tap an entry to switch what it makes: not set, filled, empty.</p>
+      </section>
+
+      <section class="card" aria-labelledby="lens-h">
+        <h2 id="lens-h">Lens</h2>
+        <div class="lens-body" id="lens" aria-live="polite"></div>
+      </section>
+
+      <div class="actions">
+        <button class="btn" id="btn-undo" type="button">Undo</button>
+        <button class="btn" id="btn-redo" type="button">Redo</button>
+        <button class="btn" id="btn-hint" type="button">Hint</button>
+        <button class="btn" id="btn-clear" type="button">Clear</button>
+      </div>
+    </aside>
+  </main>
+</div>
+
+<div class="sheet-back" id="sheet-patterns" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="pat-h">
+    <div class="sheet-head">
+      <h2 id="pat-h" tabindex="-1">Patterns</h2>
+      <button class="pill" type="button" data-close>Close</button>
+    </div>
+    <p class="calm-line" style="margin:0">Play in any order. Each set asks you to reason from less information than the one before.</p>
+    <div id="pattern-list" style="display:flex;flex-direction:column;gap:18px"></div>
+    <div class="set-block" id="practice-block">
+      <h3>Practice</h3>
+      <p>Weave a fresh random pattern at any level. These are new every time.</p>
+      <div class="practice" id="practice-list"></div>
+    </div>
+  </div>
+</div>
+
+<div class="sheet-back" id="sheet-settings" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="set-h">
+    <div class="sheet-head">
+      <h2 id="set-h" tabindex="-1">Settings</h2>
+      <button class="pill" type="button" data-close>Close</button>
+    </div>
+    <div>
+      <div class="opt">
+        <input type="checkbox" id="opt-assist">
+        <label for="opt-assist"><span class="opt-t">Show mismatches</span><span class="opt-d">Outline a woven cell in red when it does not match its clue. Turn off to spot mismatches yourself.</span></label>
+      </div>
+      <div class="opt">
+        <input type="checkbox" id="opt-calm">
+        <label for="opt-calm"><span class="opt-t">Reduce motion</span><span class="opt-d">No glow sweep when a cloth is finished, no fades.</span></label>
+      </div>
+      <div class="opt">
+        <input type="checkbox" id="opt-contrast">
+        <label for="opt-contrast"><span class="opt-t">Stronger cell edges</span><span class="opt-d">Draws a dark edge around every cell so rows and columns are easier to track.</span></label>
+      </div>
+      <div class="opt">
+        <div>
+          <span class="opt-t">Text size</span>
+          <div class="sizes" role="radiogroup" aria-label="Text size">
+            <label><input type="radio" name="size" id="size-1" value="1"> Normal</label>
+            <label><input type="radio" name="size" id="size-2" value="1.15"> Large</label>
+            <label><input type="radio" name="size" id="size-3" value="1.3"> Larger</label>
+          </div>
+        </div>
+      </div>
+      <div class="opt">
+        <div>
+          <span class="opt-t">Progress</span>
+          <span class="opt-d">Saved in this browser only.</span>
+          <div style="margin-top:8px"><button class="btn danger" id="btn-reset" type="button">Erase all progress</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+/*GEN-START*/
+function mulberry32(a){return function(){a|=0;a=(a+0x6D2B79F5)|0;let t=Math.imul(a^(a>>>15),1|a);t=(t+Math.imul(t^(t>>>7),61|t))^t;return((t^(t>>>14))>>>0)/4294967296;};}
+function shuffle(arr,rnd){for(let i=arr.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));const t=arr[i];arr[i]=arr[j];arr[j]=t;}return arr;}
+function popc(x){let n=0;while(x){n+=x&1;x>>>=1;}return n;}
+function simulate(rule,seed,W,H,out){
+  for(let c=0;c<W;c++)out[c]=seed[c];
+  for(let r=1;r<H;r++){const p=(r-1)*W,o=r*W;
+    for(let c=0;c<W;c++){const L=c>0?out[p+c-1]:0,C=out[p+c],R=c<W-1?out[p+c+1]:0;out[o+c]=(rule>>((L<<2)|(C<<1)|R))&1;}}
+}
+function neighborhood(g,W,r,c){const p=(r-1)*W;return ((c>0?g[p+c-1]:0)<<2)|(g[p+c]<<1)|(c<W-1?g[p+c+1]:0);}
+/* Logic solver: local propagation, plus (depth 1) "set one rule entry or missing top cell, follow it down, keep it if nothing breaks". */
+function makeSolver(W,H){
+  const N=W*H,pA=new Int32Array(N),pB=new Int32Array(N),pD=new Int32Array(N),queue=new Int32Array(N),inQ=new Uint8Array(N);
+  for(let r=1;r<H;r++)for(let c=0;c<W;c++){const i=r*W+c,p=(r-1)*W+c;pA[i]=c>0?p-1:-1;pB[i]=p;pD[i]=c<W-1?p+1:-1;}
+  function propagate(cells,ent,start){
+    let head=0,tail=0,count=0,ok=true;
+    const push=i=>{if(i>=W&&i<N&&!inQ[i]){inQ[i]=1;queue[tail]=i;tail=tail+1===N?0:tail+1;count++;}};
+    const touch=j=>{push(j);if(j+W<N){const c=j%W;if(c>0)push(j+W-1);push(j+W);if(c<W-1)push(j+W+1);}};
+    if(start)for(const j of start)touch(j);else for(let i=W;i<N;i++)push(i);
+    while(count){
+      const i=queue[head];head=head+1===N?0:head+1;count--;inQ[i]=0;
+      if(!ok)continue;
+      const ia=pA[i],ib=pB[i],id=pD[i];
+      const va=ia<0?0:cells[ia],vb=cells[ib],vd=id<0?0:cells[id],vy=cells[i];
+      const aL=va<0?0:va,aH=va<0?1:va,bL=vb<0?0:vb,bH=vb<0?1:vb,dL=vd<0?0:vd,dH=vd<0?1:vd,yL=vy<0?0:vy,yH=vy<0?1:vy;
+      let nv=0,A=-2,B=-2,D=-2,Y=-2,P=-2;
+      for(let a=aL;a<=aH;a++)for(let b=bL;b<=bH;b++)for(let d=dL;d<=dH;d++){
+        const n=(a<<2)|(b<<1)|d,e=ent[n];
+        for(let y=yL;y<=yH;y++){
+          if(e>=0&&e!==y)continue;
+          nv++;
+          A=A===-2?a:A===a?A:-3;B=B===-2?b:B===b?B:-3;D=D===-2?d:D===d?D:-3;Y=Y===-2?y:Y===y?Y:-3;P=P===-2?n:P===n?P:-3;
+        }
+      }
+      if(!nv){ok=false;continue;}
+      if(va<0&&A>=0){cells[ia]=A;touch(ia);}
+      if(vb<0&&B>=0){cells[ib]=B;touch(ib);}
+      if(id>=0&&vd<0&&D>=0){cells[id]=D;touch(id);}
+      if(vy<0&&Y>=0){cells[i]=Y;touch(i);}
+      if(P>=0&&Y>=0&&ent[P]<0){ent[P]=Y;for(let k=W;k<N;k++)push(k);}
+    }
+    return ok;
+  }
+  const complete=cells=>{for(let i=0;i<N;i++)if(cells[i]<0)return false;return true;};
+  function solve(seedRow,clues,clueVals,depth){
+    const cells=new Int8Array(N).fill(-1),ent=new Int8Array(8).fill(-1);
+    for(let c=0;c<W;c++)cells[c]=seedRow[c];
+    for(let q=0;q<clues.length;q++)cells[clues[q]]=clueVals[q];
+    if(!propagate(cells,ent,null))return {ok:false,cells};
+    let steps=0;
+    if(depth>=1){
+      let progress=true;
+      while(progress&&!complete(cells)){
+        progress=false;
+        const vars=[];
+        for(let n=0;n<8;n++)if(ent[n]<0)vars.push(-1-n);
+        for(let c=0;c<W;c++)if(cells[c]<0)vars.push(c);
+        outer:for(const v of vars){
+          for(let val=0;val<2;val++){
+            const c2=cells.slice(),e2=ent.slice();
+            let st;
+            if(v<0){e2[-1-v]=val;st=null;}else{c2[v]=val;st=[v];}
+            if(!propagate(c2,e2,st)){
+              if(v<0){ent[-1-v]=1-val;st=null;}else{cells[v]=1-val;st=[v];}
+              propagate(cells,ent,st);steps++;progress=true;break outer;
+            }
+          }
+        }
+      }
+    }
+    return {ok:complete(cells),cells,steps};
+  }
+  return solve;
+}
+const SETS=[
+  {name:'First threads',blurb:'Some clues sit right under the top row, so you can read rule entries straight off the cloth.',n:4,W:[7,9],H:[5,7],k:[0,0],pool:'any',depth:0,extra:[3,1],minUsed:5},
+  {name:'Reading up',blurb:'Clues start lower down. Try one entry, follow it down the cloth, and see whether the clues still fit.',n:5,W:[9,11],H:[7,9],k:[0,0],pool:'lower',depth:1,extra:[1,0],minUsed:6},
+  {name:'Missing threads',blurb:'Some top-row cells are missing. Work those out along with the rule.',n:5,W:[10,12],H:[8,10],k:[1,3],pool:'lower',depth:1,extra:[0,0],minUsed:6},
+  {name:'From the bottom',blurb:'Clues sit in the last few rows only. Work back up toward the rule and the missing start.',n:5,W:[12,14],H:[9,11],k:[2,4],pool:'bottom3',depth:1,extra:[0,0],minUsed:6},
+  {name:'Deep loom',blurb:'Clues only at the very bottom, a wider cloth, and up to five missing top cells.',n:5,W:[13,15],H:[10,12],k:[3,5],pool:'bottom2',depth:1,extra:[0,0],minUsed:6}
+];
+function lerpI(a,t){return Math.round(a[0]+(a[1]-a[0])*t);}
+function poolMinRow(pool,H){return pool==='any'?1:pool==='lower'?Math.ceil(H/3):pool==='bottom3'?H-3:H-2;}
+function generate(setIdx,t,seedNum){
+  const S=SETS[setIdx],rnd=mulberry32(seedNum>>>0);
+  const W=lerpI(S.W,t),H=lerpI(S.H,t),k=lerpI(S.k,t),extra=lerpI(S.extra,t),N=W*H;
+  const grid=new Uint8Array(N),solve=makeSolver(W,H);
+  for(let relax=0;relax<4;relax++){
+    const minRow=Math.max(1,poolMinRow(S.pool,H)-relax);
+    for(let attempt=0;attempt<60;attempt++){
+      const rule=Math.floor(rnd()*256);
+      const seed=new Uint8Array(W),dens=0.3+rnd()*0.25;let cnt=0;
+      for(let c=0;c<W;c++){seed[c]=rnd()<dens?1:0;cnt+=seed[c];}
+      if(cnt<2||cnt>W-2)continue;
+      simulate(rule,seed,W,H,grid);
+      let used=0;for(let r=1;r<H;r++)for(let c=0;c<W;c++)used|=1<<neighborhood(grid,W,r,c);
+      if(popc(used)<S.minUsed)continue;
+      const h0=Math.floor(H/2);let f=0;for(let i=h0*W;i<N;i++)f+=grid[i];
+      const frac=f/((H-h0)*W);if(frac<0.2||frac>0.8)continue;
+      const rows=new Set();for(let r=h0;r<H;r++)rows.add(Array.prototype.join.call(grid.subarray(r*W,r*W+W),''));
+      if(rows.size<Math.min(3,H-h0))continue;
+      const cols=shuffle([...Array(W).keys()],rnd).slice(0,k).sort((a,b)=>a-b);
+      const seedRow=Int8Array.from(seed);for(const h of cols)seedRow[h]=-1;
+      const pool=[];for(let i=minRow*W;i<N;i++)pool.push(i);
+      const isClue=new Uint8Array(N);let clues=[];
+      const vals=cl=>cl.map(i=>grid[i]);
+      let res=solve(seedRow,clues,[],S.depth),ok=true;
+      while(!res.ok){
+        const cand=pool.filter(i=>!isClue[i]&&res.cells[i]<0);
+        if(!cand.length){ok=false;break;}
+        const cell=cand[Math.floor(rnd()*cand.length)];
+        isClue[cell]=1;clues.push(cell);
+        res=solve(seedRow,clues,vals(clues),S.depth);
+      }
+      if(!ok)continue;
+      for(const cl of shuffle(clues.slice(),rnd)){
+        const rest=clues.filter(c=>c!==cl);
+        if(solve(seedRow,rest,vals(rest),S.depth).ok){clues=rest;isClue[cl]=0;}
+      }
+      const free=shuffle(pool.filter(c=>!isClue[c]),rnd);
+      for(let e=0;e<extra&&e<free.length;e++){isClue[free[e]]=1;}
+      const finalClues=[];for(let i=0;i<N;i++)if(isClue[i])finalClues.push(i);
+      const steps=solve(seedRow,finalClues,vals(finalClues),S.depth).steps;
+      return {W,H,rule,seed:Array.from(seed),hidden:cols,clues:finalClues,grid:Array.from(grid),used,set:setIdx,minRow,relax,steps};
+    }
+  }
+  return null;
+}
+const COURSE=[];
+SETS.forEach((S,si)=>{for(let j=0;j<S.n;j++)COURSE.push({set:si,t:S.n>1?j/(S.n-1):0,seed:(20261021+COURSE.length*104729)>>>0});});
+/*GEN-END*/
+if(typeof document==='undefined'){globalThis.__LOOM={generate,COURSE,SETS,simulate};return;}
+
+/* ---------- storage ---------- */
+const KEY='loomlogic.v1';
+const defaults=()=>({settings:{assist:true,calm:false,contrast:false,scale:1},solved:{},saved:{},cur:{kind:'course',i:0},practice:null,howtoClosed:false});
+function loadStore(){try{const s=localStorage.getItem(KEY);if(!s)return null;const o=JSON.parse(s);return Object.assign(defaults(),o,{settings:Object.assign(defaults().settings,o.settings||{})});}catch(e){return null;}}
+let store=defaults();
+function saveStore(){try{localStorage.setItem(KEY,JSON.stringify(store));}catch(e){}}
+
+/* ---------- level cache ---------- */
+const cache={};
+function courseLevel(i){if(!cache['c'+i]){const c=COURSE[i];cache['c'+i]=generate(c.set,c.t,c.seed);}return cache['c'+i];}
+function practiceLevel(cur){
+  const id='p'+cur.set+'-'+cur.seed;
+  if(!cache[id]){let lv=null,s=cur.seed;for(let tries=0;tries<6&&!lv;tries++,s++)lv=generate(cur.set,cur.t,s);cache[id]=lv;}
+  return cache[id];
+}
+
+/* ---------- state ---------- */
+const $=s=>document.querySelector(s);
+const clothEl=$('#cloth'),entriesEl=$('#entries'),lensEl=$('#lens'),statusEl=$('#status'),rulenumEl=$('#rulenum');
+let L=null,key='',W=0,H=0,N=0,hiddenSet=null,clueAt=null,cellEls=[],entryEls=[];
+let rule=new Int8Array(8).fill(-1),seedU=null,marks=null,mode='look',hints=0,solved=false,sel=-1,undo=[],redo=[],flash='',g=null,busy=false;
+const ORDER=[7,6,5,4,3,2,1,0];
+const word=v=>v===1?'filled':v===0?'empty':'not known yet';
+const bits=n=>((n>>2)&1)+''+((n>>1)&1)+(n&1);
+const cyc=v=>v===-1?1:v===1?0:-1;
+
+function compute(){
+  g=new Int8Array(N);
+  for(let c=0;c<W;c++)g[c]=seedU[c];
+  for(let r=1;r<H;r++){const p=(r-1)*W,o=r*W;
+    for(let c=0;c<W;c++){
+      const a=c>0?g[p+c-1]:0,b=g[p+c],d=c<W-1?g[p+c+1]:0;
+      if(a<0||b<0||d<0){g[o+c]=-1;continue;}
+      g[o+c]=rule[(a<<2)|(b<<1)|d];
+    }}
+}
+function isSolved(){for(let i=0;i<N;i++)if(g[i]!==L.grid[i])return false;return true;}
+
+/* ---------- loading ---------- */
+function loadLevel(cur){
+  store.cur=cur;
+  let lv;
+  if(cur.kind==='course'){lv=courseLevel(cur.i);key='c'+cur.i;}
+  else{lv=practiceLevel(cur);key='p';}
+  L=lv;W=L.W;H=L.H;N=W*H;
+  hiddenSet=new Uint8Array(W);for(const h of L.hidden)hiddenSet[h]=1;
+  clueAt=new Int8Array(N).fill(-1);for(const c of L.clues)clueAt[c]=L.grid[c];
+  const sv=store.saved[key];
+  rule=sv&&sv.rule&&sv.rule.length===8?Int8Array.from(sv.rule):new Int8Array(8).fill(-1);
+  seedU=Int8Array.from(L.seed);
+  L.hidden.forEach((h,j)=>{seedU[h]=sv&&sv.seed&&sv.seed[j]!=null?sv.seed[j]:-1;});
+  hints=sv?sv.hints||0:0;
+  marks=new Int8Array(N).fill(-1);
+  if(sv&&Array.isArray(sv.marks)&&sv.marks.length===N)marks=Int8Array.from(sv.marks);
+  undo=[];redo=[];sel=-1;flash='';solved=false;
+  buildCloth();
+  busy=false;clothEl.classList.remove('busy');
+  render(false);
+  saveStore();
+  if(cur.kind==='course'&&cur.i+1<COURSE.length)setTimeout(()=>{try{courseLevel(cur.i+1);}catch(e){}},600);
+}
+function loadLevelSoon(cur){
+  busy=true;clothEl.classList.add('busy');
+  statusEl.innerHTML='<span class="busy-line">Setting up the loom…</span>';
+  setTimeout(()=>loadLevel(cur),30);
+}
+function saveLevel(){
+  store.saved[key]={rule:Array.from(rule),seed:L.hidden.map(h=>seedU[h]),marks:Array.from(marks),hints};
+  saveStore();
+}
+
+/* ---------- building DOM ---------- */
+function buildCloth(){
+  clothEl.innerHTML='';cellEls=new Array(N);
+  clothEl.style.setProperty('--w',W);
+  clothEl.setAttribute('aria-label','Cloth, '+W+' columns by '+H+' rows');
+  const frag=document.createDocumentFragment();
+  for(let c=0;c<W;c++){const d=document.createElement('div');d.className='warp';d.setAttribute('aria-hidden','true');frag.appendChild(d);}
+  for(let r=0;r<H;r++){
+    for(let c=0;c<W;c++){
+      const i=r*W+c,b=document.createElement('button');
+      b.type='button';b.className='cell';b.dataset.i=i;b.tabIndex=-1;b.style.setProperty('--r',r);
+      cellEls[i]=b;frag.appendChild(b);
+    }
+    if(r===0){const d=document.createElement('div');d.className='divider';d.setAttribute('aria-hidden','true');frag.appendChild(d);}
+  }
+  clothEl.appendChild(frag);
+}
+function buildEntries(){
+  entriesEl.innerHTML='';entryEls=[];
+  ORDER.forEach((n,pos)=>{
+    const b=document.createElement('button');b.type='button';b.className='entry';b.dataset.n=n;
+    b.innerHTML='<span class="pat" aria-hidden="true"><i class="'+((n>>2)&1?'f':'')+'"></i><i class="'+((n>>1)&1?'f':'')+'"></i><i class="'+(n&1?'f':'')+'"></i></span><span class="stem" aria-hidden="true"></span><span class="out"></span><span class="bits" aria-hidden="true">'+bits(n)+'</span>';
+    entryEls[n]=b;entriesEl.appendChild(b);
+  });
+}
+
+/* ---------- glyph helpers ---------- */
+const gl=(v,extra)=>'<span class="g '+(v===1?'f':v===0?'e':v===2?'x':'')+(extra?' '+extra:'')+'" aria-hidden="true"></span>';
+const clueGl=v=>gl(0,v?'cf':'ce');
+function lrow(label,html){return '<div class="lrow"><span class="lab">'+label+'</span><span>'+html+'</span></div>';}
+
+/* ---------- render ---------- */
+function selEntry(){
+  if(sel<0)return -1;const r=Math.floor(sel/W),c=sel%W;if(r===0)return -1;
+  const p=(r-1)*W,a=c>0?g[p+c-1]:0,b=g[p+c],d=c<W-1?g[p+c+1]:0;
+  if(a<0||b<0||d<0)return -1;return (a<<2)|(b<<1)|d;
+}
+function render(fromAction){
+  compute();
+  const was=solved;solved=isSolved();
+  if(solved&&!store.solved[key]&&key!=='p'){store.solved[key]={hints};saveStore();}
+  const justSolved=solved&&!was&&fromAction;
+  const assist=store.settings.assist;
+  const se=selEntry();
+  const sr=sel>=0?Math.floor(sel/W):-1,sc=sel>=0?sel%W:-1;
+  for(let i=0;i<N;i++){
+    const r=Math.floor(i/W),c=i%W,v=g[i];
+    let cls='cell '+(v===1?'f':v===0?'e':'u');
+    if(r===0&&hiddenSet[c])cls+=' seedh';
+    const cv=clueAt[i];
+    if(cv>=0)cls+=cv?' cf':' ce';
+    const bad=cv>=0&&v>=0&&v!==cv;
+    if(bad&&assist)cls+=' bad';
+    const mk=cv<0&&r>0?marks[i]:-1,mbad=mk>=0&&v>=0&&v!==mk;
+    if(mk>=0){cls+=mk?' mf':' me';if(mbad&&assist)cls+=' mbad';}
+    if(i===sel)cls+=' sel';
+    else if(sr>0&&r===sr-1&&Math.abs(c-sc)<=1)cls+=' par';
+    if(se>=0&&r>0&&i!==sel){
+      const p=(r-1)*W,a=c>0?g[p+c-1]:0,b=g[p+c],d=c<W-1?g[p+c+1]:0;
+      if(a>=0&&b>=0&&d>=0&&((a<<2)|(b<<1)|d)===se)cls+=' same';
+    }
+    const el=cellEls[i];
+    if(el.className!==cls)el.className=cls;
+    let lab='Row '+(r+1)+', column '+(c+1)+': '+word(v);
+    if(r===0)lab+=hiddenSet[c]?', missing top cell, tap to change':', given';
+    if(cv>=0)lab+=', clue '+word(cv)+(bad?', does not match':'');
+    if(mk>=0)lab+=', your mark '+word(mk)+(mbad?', does not match':'');
+    if(el.getAttribute('aria-label')!==lab)el.setAttribute('aria-label',lab);
+  }
+  const fi=sel>=0?sel:0;
+  cellEls.forEach((el,i)=>{const t=i===fi?0:-1;if(el.tabIndex!==t)el.tabIndex=t;});
+  for(const n of ORDER){
+    const el=entryEls[n],v=rule[n];
+    el.querySelector('.out').className='out '+(v===1?'f':v===0?'e':'');
+    el.classList.toggle('hl',n===se);
+    el.setAttribute('aria-label','Pattern '+[(n>>2)&1,(n>>1)&1,n&1].map(word).join(', ')+' makes '+(v<0?'not set':word(v))+'. Tap to change.');
+  }
+  // rule number
+  const digs=ORDER.map(n=>rule[n]<0?'?':String(rule[n]));
+  const full=digs.indexOf('?')<0;
+  let num=0;for(let n=0;n<8;n++)if(rule[n]===1)num|=1<<n;
+  rulenumEl.innerHTML='binary '+digs.slice(0,4).join('')+' '+digs.slice(4).join('')+(full?' = <b>Rule '+num+'</b>':'');
+  lensEl.innerHTML=lensHTML();
+  renderStatus();
+  $('#btn-undo').disabled=!undo.length;
+  $('#btn-redo').disabled=!redo.length;
+  $('#btn-hint').disabled=solved;
+  if(justSolved&&!store.settings.calm){
+    clothEl.classList.remove('sweep');void clothEl.offsetWidth;clothEl.classList.add('sweep');
+    setTimeout(()=>clothEl.classList.remove('sweep'),H*70+900);
+  }
+}
+function renderStatus(){
+  if(busy)return;
+  const cur=store.cur,S=SETS[L.set];
+  const label=cur.kind==='course'?'Pattern '+(cur.i+1):'Practice';
+  if(solved){
+    let unused=0;for(let n=0;n<8;n++)if(!((L.used>>n)&1))unused++;
+    let sub=[];
+    if(unused)sub.push(unused===1?'One entry never came up in this cloth, so it could be anything.':unused+' entries never came up in this cloth, so they could be anything.');
+    if(hints)sub.push(hints===1?'You used 1 hint.':'You used '+hints+' hints.');
+    const nextLabel=cur.kind==='course'?(cur.i+1<COURSE.length?'Next pattern':'Choose more'):'New '+S.name.toLowerCase();
+    statusEl.innerHTML='<div class="won"><div class="won-text"><strong>Woven.</strong> '+label+' was made by Rule '+L.rule+'.'+(sub.length?'<span class="won-sub">'+sub.join(' ')+'</span>':'')+'</div><button class="btn primary" type="button" id="btn-next">'+nextLabel+'</button></div>';
+    $('#btn-next').addEventListener('click',goNext);
+  }else{
+    const k=L.hidden.length,top=Math.min(...L.clues.map(c=>Math.floor(c/W)))+1;
+    statusEl.innerHTML='<div class="lvl"><span class="lvl-n">'+label+'</span><span class="lvl-set">'+S.name+'</span></div><div class="meta">'+L.clues.length+' clues in rows '+top+'–'+H+' · '+(k?k+' missing top cell'+(k>1?'s':''):'top row given')+'</div>';
+  }
+}
+function lensHTML(){
+  let h='';
+  if(flash)h+='<p class="flash">'+flash+'</p>';
+  if(sel<0){
+    h+='<p class="lens-note">Tap any cell in the cloth. The lens shows the three cells above it, the rule entry that made it, and its clue if it has one.</p>';
+    return h;
+  }
+  const r=Math.floor(sel/W),c=sel%W,v=g[sel];
+  h+='<p class="where">Row '+(r+1)+', column '+(c+1)+(r===0?' (top row)':'')+'</p>';
+  if(r===0){
+    if(hiddenSet[c])h+='<p>This top-row cell is missing, so you decide it. Tap it to switch: not set, filled, empty. '+(v<0?'It is not set yet.':'You set it to '+gl(v)+word(v)+'.')+'</p>';
+    else h+='<p>Top-row cells are given. They are not made by the rule. This one is '+gl(v)+word(v)+'.</p>';
+  }else{
+    const p=(r-1)*W;
+    const par=[c>0?g[p+c-1]:2,g[p+c],c<W-1?g[p+c+1]:2];
+    const names=par.map(x=>x===2?'edge (empty)':word(x));
+    h+=lrow('Above it',par.map(x=>gl(x)).join('')+' <span class="lens-note">'+names.join(', ')+'</span>');
+    const miss=par.findIndex(x=>x===-1);
+    if(miss>=0){
+      h+=lrow('Rule entry','Can’t tell yet. The cell '+['above-left','straight above','above-right'][miss]+' is not known yet.');
+    }else{
+      const val=x=>x===2?0:x;
+      const n=(val(par[0])<<2)|(val(par[1])<<1)|val(par[2]);
+      const rv=rule[n];
+      h+=lrow('Rule entry','<span class="mono">'+bits(n)+'</span> makes '+(rv<0?'nothing yet (not set)':gl(rv)+word(rv)));
+      let cnt=0;
+      for(let rr=1;rr<H;rr++)for(let cc=0;cc<W;cc++){const pp=(rr-1)*W,a=cc>0?g[pp+cc-1]:0,b=g[pp+cc],d=cc<W-1?g[pp+cc+1]:0;if(a>=0&&b>=0&&d>=0&&((a<<2)|(b<<1)|d)===n)cnt++;}
+      h+='<p class="lens-note">This pattern sits above '+cnt+' cell'+(cnt===1?'':'s')+' woven so far. They are marked with a yellow corner.</p>';
+    }
+    h+=lrow('This cell',v<0?'not known yet':gl(v)+word(v));
+  }
+  const cv=clueAt[sel];
+  if(cv>=0){
+    const st=v<0?'':v===cv?' <span class="match">Matches.</span>':' <span class="mismatch">Does not match.</span>';
+    h+=lrow('Clue',clueGl(cv)+'must be '+word(cv)+'.'+st);
+  }else if(r>0){
+    h+=lrow('Clue','none');
+    const mk=marks[sel];
+    if(mk>=0){
+      const st=v<0?'':v===mk?' <span class="match">Matches the cloth.</span>':' <span class="mismatch">The cloth says otherwise.</span>';
+      h+=lrow('Your mark',gl(0,mk?'mf':'me')+word(mk)+'.'+st);
+    }
+  }
+  return h;
+}
+
+/* ---------- actions ---------- */
+function snap(){return {rule:Array.from(rule),seed:Array.from(seedU),marks:Array.from(marks)};}
+function applySnap(s){rule=Int8Array.from(s.rule);seedU=Int8Array.from(s.seed);marks=Int8Array.from(s.marks);}
+function pushUndo(){undo.push(snap());if(undo.length>400)undo.shift();redo=[];}
+function act(fn){if(busy)return;flash='';fn();render(true);saveLevel();}
+function tapCell(i){
+  act(()=>{
+    const r=Math.floor(i/W),c=i%W;
+    if(r===0&&hiddenSet[c]){pushUndo();seedU[c]=cyc(seedU[c]);}
+    else if(mode==='mark'){
+      if(r===0)flash='Top-row cells can’t be marked. Missing ones are set by tapping them.';
+      else if(clueAt[i]>=0)flash='This cell already has a clue, so it doesn’t need a mark.';
+      else{pushUndo();marks[i]=cyc(marks[i]);}
+    }
+    sel=i;
+  });
+}
+function setMode(m){
+  mode=m;
+  $('#mode-look').setAttribute('aria-pressed',String(m==='look'));
+  $('#mode-mark').setAttribute('aria-pressed',String(m==='mark'));
+  $('#mode-hint').textContent=m==='look'?'Look shows what made a cell.':'Each tap switches: no mark, dot (filled), ring (empty).';
+}
+$('#mode-look').addEventListener('click',()=>setMode('look'));
+$('#mode-mark').addEventListener('click',()=>setMode('mark'));
+function cycleEntry(n){act(()=>{pushUndo();rule[n]=cyc(rule[n]);});}
+function doUndo(){if(!undo.length)return;act(()=>{redo.push(snap());applySnap(undo.pop());});}
+function doRedo(){if(!redo.length)return;act(()=>{undo.push(snap());applySnap(redo.pop());});}
+function doClear(){
+  act(()=>{
+    const any=rule.some(v=>v>=0)||L.hidden.some(h=>seedU[h]>=0)||marks.some(v=>v>=0);
+    if(!any){flash='Nothing to clear yet.';return;}
+    pushUndo();rule.fill(-1);for(const h of L.hidden)seedU[h]=-1;marks.fill(-1);
+    flash='Cleared the rule card, marks'+(L.hidden.length?' and missing top cells':'')+'. Undo brings it all back.';
+  });
+}
+function doHint(){
+  if(solved)return;
+  act(()=>{
+    const truth=n=>(L.rule>>n)&1;
+    const usedN=[];for(let n=0;n<8;n++)if((L.used>>n)&1)usedN.push(n);
+    // earliest row each entry is first used, so hints follow the cloth top-down
+    const first={};for(let r=1;r<H;r++)for(let c=0;c<W;c++){const n=neighborhood(L.grid,W,r,c);if(first[n]==null)first[n]=r;}
+    usedN.sort((a,b)=>first[a]-first[b]);
+    const wrongE=usedN.find(n=>rule[n]>=0&&rule[n]!==truth(n));
+    const wrongS=L.hidden.find(h=>seedU[h]>=0&&seedU[h]!==L.seed[h]);
+    const unsetE=usedN.find(n=>rule[n]<0);
+    const unsetS=L.hidden.find(h=>seedU[h]<0);
+    if(wrongE==null&&wrongS==null){
+      // first try pointing at a clue that can be read directly, without giving the answer away
+      for(let i=W;i<N;i++){
+        if(clueAt[i]<0)continue;
+        const r=Math.floor(i/W),c=i%W,p=(r-1)*W,a=c>0?g[p+c-1]:0,b=g[p+c],d=c<W-1?g[p+c+1]:0;
+        if(a<0||b<0||d<0)continue;
+        const n=(a<<2)|(b<<1)|d;
+        if(rule[n]<0){
+          sel=i;hints++;
+          flash='Hint: look at row '+(r+1)+', column '+(c+1)+'. The three cells above it are known and it has a clue, so it tells you what entry <span class="mono">'+bits(n)+'</span> makes.';
+          return;
+        }
+      }
+    }
+    pushUndo();
+    if(wrongE!=null){rule[wrongE]=truth(wrongE);flash='Hint: entry <span class="mono">'+bits(wrongE)+'</span> was set the wrong way. It makes '+gl(truth(wrongE))+word(truth(wrongE))+'. Switched it for you.';}
+    else if(wrongS!=null){seedU[wrongS]=L.seed[wrongS];flash='Hint: top cell in column '+(wrongS+1)+' was set the wrong way. It is '+gl(L.seed[wrongS])+word(L.seed[wrongS])+'. Switched it for you.';}
+    else if(unsetE!=null){rule[unsetE]=truth(unsetE);flash='Hint: entry <span class="mono">'+bits(unsetE)+'</span> makes '+gl(truth(unsetE))+word(truth(unsetE))+'. Set it for you.';}
+    else if(unsetS!=null){seedU[unsetS]=L.seed[unsetS];flash='Hint: top cell in column '+(unsetS+1)+' is '+gl(L.seed[unsetS])+word(L.seed[unsetS])+'. Set it for you.';}
+    else{undo.pop();flash='Everything that matters is already set correctly.';return;}
+    hints++;
+  });
+}
+function goNext(){
+  const cur=store.cur;
+  if(cur.kind==='course'){
+    if(cur.i+1<COURSE.length)loadLevelSoon({kind:'course',i:cur.i+1});
+    else openSheet('sheet-patterns');
+  }else newPractice(cur.set);
+}
+function newPractice(set){
+  const cur={kind:'practice',set,seed:(Math.random()*2147483647)>>>0,t:Math.random()};
+  store.practice=cur;delete store.saved.p;
+  loadLevelSoon(cur);
+}
+
+/* ---------- events ---------- */
+clothEl.addEventListener('click',e=>{const b=e.target.closest('.cell');if(b)tapCell(+b.dataset.i);});
+clothEl.addEventListener('keydown',e=>{
+  const b=e.target.closest('.cell');if(!b)return;
+  const i=+b.dataset.i,r=Math.floor(i/W),c=i%W;let j=-1;
+  if(e.key==='ArrowLeft'&&c>0)j=i-1;
+  else if(e.key==='ArrowRight'&&c<W-1)j=i+1;
+  else if(e.key==='ArrowUp'&&r>0)j=i-W;
+  else if(e.key==='ArrowDown'&&r<H-1)j=i+W;
+  else if(e.key==='Home')j=r*W;
+  else if(e.key==='End')j=r*W+W-1;
+  if(j>=0){e.preventDefault();flash='';sel=j;render(true);cellEls[j].focus();}
+});
+entriesEl.addEventListener('click',e=>{const b=e.target.closest('.entry');if(b)cycleEntry(+b.dataset.n);});
+$('#btn-undo').addEventListener('click',doUndo);
+$('#btn-redo').addEventListener('click',doRedo);
+$('#btn-hint').addEventListener('click',doHint);
+$('#btn-clear').addEventListener('click',doClear);
+document.addEventListener('keydown',e=>{
+  const open=document.querySelector('.sheet-back:not([hidden])');
+  if(open){if(e.key==='Escape')closeSheet(open);return;}
+  if(e.target.closest('input,textarea,select'))return;
+  if(e.metaKey||e.ctrlKey){
+    if(e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?doRedo():doUndo();}
+    return;
+  }
+  if(/^[1-8]$/.test(e.key)){cycleEntry(ORDER[+e.key-1]);}
+  else if(e.key==='m'||e.key==='M'){setMode(mode==='look'?'mark':'look');}
+  else if(e.key==='z'||e.key==='Z'){doUndo();}
+  else if(e.key==='y'||e.key==='Y'){doRedo();}
+});
+
+/* ---------- sheets ---------- */
+let lastFocus=null;
+function openSheet(id){
+  const el=document.getElementById(id);
+  if(id==='sheet-patterns')buildPatternList();
+  if(id==='sheet-settings')syncSettingsForm();
+  lastFocus=document.activeElement;el.hidden=false;
+  el.querySelector('h2').focus();
+}
+function closeSheet(el){el.hidden=true;if(lastFocus&&lastFocus.focus)lastFocus.focus();}
+document.querySelectorAll('.sheet-back').forEach(back=>{
+  back.addEventListener('click',e=>{if(e.target===back||e.target.closest('[data-close]'))closeSheet(back);});
+});
+$('#btn-patterns').addEventListener('click',()=>openSheet('sheet-patterns'));
+$('#btn-settings').addEventListener('click',()=>openSheet('sheet-settings'));
+
+function buildPatternList(){
+  const list=$('#pattern-list');list.innerHTML='';
+  let gi=0;
+  SETS.forEach((S,si)=>{
+    const block=document.createElement('div');block.className='set-block';
+    let done=0;const btns=[];
+    for(let j=0;j<S.n;j++,gi++){
+      const i=gi,isDone=!!store.solved['c'+i];if(isDone)done++;
+      const isCur=store.cur.kind==='course'&&store.cur.i===i;
+      btns.push('<button type="button" class="lv'+(isDone?' done':'')+(isCur?' cur':'')+'" data-i="'+i+'" aria-label="Pattern '+(i+1)+(isDone?', woven':'')+(isCur?', current':'')+'">'+(i+1)+'</button>');
+    }
+    block.innerHTML='<h3>'+S.name+'<span class="meta">'+done+' of '+S.n+' woven</span></h3><p>'+S.blurb+'</p><div class="lv-row">'+btns.join('')+'</div>';
+    list.appendChild(block);
+  });
+  list.querySelectorAll('.lv').forEach(b=>b.addEventListener('click',()=>{
+    closeSheet($('#sheet-patterns'));loadLevelSoon({kind:'course',i:+b.dataset.i});
+  }));
+  const pl=$('#practice-list');pl.innerHTML='';
+  SETS.forEach((S,si)=>{
+    const b=document.createElement('button');b.type='button';b.className='btn';
+    b.innerHTML=S.name+'<small>New random pattern</small>';
+    b.addEventListener('click',()=>{closeSheet($('#sheet-patterns'));newPractice(si);});
+    pl.appendChild(b);
+  });
+}
+
+/* ---------- settings ---------- */
+function applySettings(){
+  const s=store.settings,root=document.documentElement;
+  root.classList.toggle('calm',!!s.calm);
+  root.classList.toggle('contrast',!!s.contrast);
+  root.style.setProperty('--scale',String(s.scale||1));
+}
+function syncSettingsForm(){
+  const s=store.settings;
+  $('#opt-assist').checked=!!s.assist;$('#opt-calm').checked=!!s.calm;$('#opt-contrast').checked=!!s.contrast;
+  document.querySelectorAll('input[name=size]').forEach(r=>{r.checked=Math.abs(+r.value-(s.scale||1))<.01;});
+  resetArmed=false;$('#btn-reset').textContent='Erase all progress';
+}
+$('#opt-assist').addEventListener('change',e=>{store.settings.assist=e.target.checked;saveStore();render(false);});
+$('#opt-calm').addEventListener('change',e=>{store.settings.calm=e.target.checked;saveStore();applySettings();});
+$('#opt-contrast').addEventListener('change',e=>{store.settings.contrast=e.target.checked;saveStore();applySettings();});
+document.querySelectorAll('input[name=size]').forEach(r=>r.addEventListener('change',e=>{store.settings.scale=+e.target.value;saveStore();applySettings();}));
+let resetArmed=false,resetTimer=0;
+$('#btn-reset').addEventListener('click',e=>{
+  if(!resetArmed){resetArmed=true;e.target.textContent='Tap again to erase everything';clearTimeout(resetTimer);resetTimer=setTimeout(()=>{resetArmed=false;e.target.textContent='Erase all progress';},4000);return;}
+  const keep=store.settings;store=defaults();store.settings=keep;saveStore();
+  resetArmed=false;e.target.textContent='Progress erased';
+  loadLevel({kind:'course',i:0});$('#howto').open=true;
+});
+
+const howto=$('#howto');
+howto.addEventListener('toggle',()=>{store.howtoClosed=!howto.open;saveStore();});
+
+/* ---------- boot ---------- */
+function start(data){
+  const fromHot=data&&data.store;
+  store=fromHot?data.store:(loadStore()||defaults());
+  if(!fromHot&&store.settings.calm==null)store.settings.calm=false;
+  applySettings();
+  buildEntries();
+  howto.open=!store.howtoClosed;
+  let cur=store.cur||{kind:'course',i:0};
+  if(cur.kind==='course'&&!(cur.i>=0&&cur.i<COURSE.length))cur={kind:'course',i:0};
+  if(cur.kind==='practice'&&!(cur.set>=0&&cur.set<SETS.length))cur={kind:'course',i:0};
+  loadLevel(cur);
+  if(fromHot&&typeof data.sel==='number'&&data.sel<N){sel=data.sel;render(false);}
+  try{window.claude?.hot?.snapshot?.(()=>({store,sel}));}catch(e){}
+}
+window.claude?.hot?.ready?window.claude.hot.ready(start):start(window.claude?.hot?.data??{});
+})();
+</script>
+</body>
+</html>
