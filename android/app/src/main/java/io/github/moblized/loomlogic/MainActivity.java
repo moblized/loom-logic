@@ -71,6 +71,15 @@ public class MainActivity extends Activity {
         web.onResume();
     }
 
+    /** The game follows the phone's dark mode, so the home-screen icon does too, once the app is out of sight. */
+    @Override
+    protected void onStop() {
+        super.onStop();
+        if (!isChangingConfigurations()) {
+            AppIcon.sync(this, AppIcon.phoneIsDark(this));
+        }
+    }
+
     @Override
     protected void onDestroy() {
         if (web != null) {
